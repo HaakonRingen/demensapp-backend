@@ -14,7 +14,7 @@
   "dependencies": {
     "@twilio/voice-sdk": "^2.18.1",
     "cors": "^2.8.6",
-    "dotenv": "^17.3.1",
+    "dotenv": "^16.4.7",
     "express": "^5.2.1",
     "twilio": "^5.13.0"
   }
