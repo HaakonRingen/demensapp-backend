@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <title>Demensapp – Test Ring</title>
+  <script src="/twilio.min.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #0a0a2e; color: white; text-align: center; padding: 40px; }
+    h1 { color: #FFD700; font-size: 2em; }
+    button { font-size: 1.5em; padding: 20px 40px; margin: 10px; border-radius: 16px; border: none; cursor: pointer; }
+    #setupBtn { background: #1a55cc; color: white; }
+    #callBtn { background: #00aa44; color: white; }
+    #hangupBtn { background: #aa2200; color: white; display: none; }
+    #status { margin-top: 20px; font-size: 1.2em; color: #AAAACC; }
+    select { font-size: 1.2em; padding: 10px; margin: 10px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>📞 Test Ring til Bruker</h1>
+  <p>Logger inn som:</p>
+  <select id="identity">
+    <option value="hakon">👨 Håkon (Sønn)</option>
+    <option value="kari">👩 Kari (Datter)</option>
+    <option value="per">👦 Per (Barnebarn)</option>
+    <option value="lege_olsen">👨‍⚕️ Lege Olsen</option>
+  </select>
+  <br><br>
+  <button id="setupBtn" onclick="setup()">🔌 Koble til</button>
+  <br><br>
+  <button id="callBtn" onclick="startCall()" disabled>📞 Ring bruker_ola</button>
+  <button id="hangupBtn" onclick="hangUp()">📵 Legg på</button>
+  <p id="status">Ikke tilkoblet</p>
+
+  <script>
+    const BACKEND = window.location.origin;
+    let device, activeCall;
+
+    async function setup() {
+      const identity = document.getElementById('identity').value;
+      setStatus('Henter token...');
+      try {
+        const res = await fetch(`${BACKEND}/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identity })
+        });
+        const { token } = await res.json();
+
+        device = new Twilio.Device(token, { logLevel: 'info' });
+
+        device.on('registered', () => {
+          setStatus(`✅ Tilkoblet som: ${identity}`);
+          document.getElementById('callBtn').disabled = false;
+          document.getElementById('setupBtn').textContent = '✅ Tilkoblet';
+        });
+
+        device.on('error', (e) => setStatus('Feil: ' + e.message));
+
+        await device.register();
+      } catch (e) {
+        setStatus('Feil: ' + e.message);
+      }
+    }
+
+    async function startCall() {
+      setStatus('Ringer bruker_ola...');
+      document.getElementById('callBtn').style.display = 'none';
+      document.getElementById('hangupBtn').style.display = 'inline-block';
+      activeCall = await device.connect({ params: { To: 'client:bruker_ola' } });
+      activeCall.on('disconnect', () => {
+        document.getElementById('callBtn').style.display = 'inline-block';
+        document.getElementById('hangupBtn').style.display = 'none';
+        setStatus('Samtale avsluttet');
+        activeCall = null;
+      });
+    }
+
+    function hangUp() {
+      if (activeCall) activeCall.disconnect();
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status').textContent = msg;
+    }
+  </script>
+</body>
+</html>
