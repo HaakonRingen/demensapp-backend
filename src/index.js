@@ -13,6 +13,38 @@ const VoiceGrant = AccessToken.VoiceGrant;
 
 // Midlertidig lagring av ventende anrop (erstatt med DB i produksjon)
 const pendingCalls = {}; // { identity: { callId, callerIdentity, conferenceName, timestamp } }
+const pushTokens = {}; // { identity: expoPushToken }
+
+async function sendPushNotification(identity, callId, callerIdentity, conferenceName) {
+  const token = pushTokens[identity];
+  if (!token) return;
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: token,
+        title: 'Innkommende anrop',
+        body: `${callerIdentity} ringer`,
+        data: { callId, callerIdentity, conferenceName },
+        sound: 'default',
+        priority: 'high',
+        channelId: 'incoming-call',
+      }),
+    });
+  } catch (e) {
+    console.warn('Push-varsel feilet:', e.message);
+  }
+}
+
+// Registrer Expo push token
+app.post('/register-push-token', (req, res) => {
+  const { identity, pushToken } = req.body;
+  if (!identity || !pushToken) return res.status(400).json({ error: 'identity og pushToken påkrevd' });
+  pushTokens[identity] = pushToken;
+  console.log(`Push token registrert for ${identity}`);
+  res.json({ ok: true });
+});
 
 // Testside
 app.get('/test', (req, res) => res.sendFile(__dirname + '/testcall.html'));
@@ -64,6 +96,9 @@ app.post('/voice', (req, res) => {
       conferenceName,
       timestamp: Date.now(),
     };
+
+    // Send push-varsel til mottaker
+    sendPushNotification(targetIdentity, callId, from, conferenceName);
 
     const dial = twiml.dial();
     dial.conference(conferenceName, {
